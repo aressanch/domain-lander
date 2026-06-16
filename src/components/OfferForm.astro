@@ -1,0 +1,109 @@
+---
+interface Props {
+  domain: string;
+}
+const { domain } = Astro.props;
+
+// Public site key is inlined at build (it's public by design). When unset, the
+// Turnstile widget is omitted and the server treats verification as disabled.
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
+---
+
+<form id="offer-form" class="offer" novalidate>
+  <input type="hidden" name="domain" value={domain} />
+
+  <!-- Honeypot: real users never see or fill this. -->
+  <div class="hp" aria-hidden="true">
+    <label>Website<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+  </div>
+
+  <div class="field">
+    <label for="of-name">Name</label>
+    <input id="of-name" name="name" type="text" autocomplete="name" />
+  </div>
+
+  <div class="field">
+    <label for="of-email">Email <span class="req">*</span></label>
+    <input id="of-email" name="email" type="email" inputmode="email" autocomplete="email" required />
+  </div>
+
+  <div class="field">
+    <label for="of-amount">Your offer (USD) <span class="req">*</span></label>
+    <input id="of-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" required />
+  </div>
+
+  <div class="field">
+    <label for="of-message">Message</label>
+    <textarea id="of-message" name="message" rows="3"></textarea>
+  </div>
+
+  {turnstileSiteKey && (
+    <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-theme="auto"></div>
+  )}
+
+  <button type="submit" class="btn primary">Submit offer</button>
+
+  <p id="of-status" class="status" role="status" aria-live="polite"></p>
+</form>
+
+{turnstileSiteKey && (
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer is:inline></script>
+)}
+
+<script>
+  const form = document.getElementById("offer-form") as HTMLFormElement | null;
+  const status = document.getElementById("of-status") as HTMLElement | null;
+  if (form && status) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      status.textContent = "";
+      status.className = "status";
+
+      const data = new FormData(form);
+      const token =
+        (data.get("cf-turnstile-response") as string | null) ?? "";
+
+      const payload = {
+        domain: String(data.get("domain") ?? ""),
+        name: String(data.get("name") ?? ""),
+        email: String(data.get("email") ?? ""),
+        amount: Number(data.get("amount") ?? 0),
+        message: String(data.get("message") ?? ""),
+        website: String(data.get("website") ?? ""), // honeypot
+        turnstileToken: token,
+      };
+
+      const btn = form.querySelector(
+        'button[type="submit"]',
+      ) as HTMLButtonElement | null;
+      if (btn) btn.disabled = true;
+      status.textContent = "Sending…";
+
+      try {
+        const res = await fetch("/api/offer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const ok = res.ok && ((await res.json()) as { ok?: boolean }).ok;
+        if (ok) {
+          form.querySelectorAll("input,textarea,button").forEach((el) => {
+            (el as HTMLInputElement).disabled = true;
+          });
+          status.className = "status ok";
+          status.textContent =
+            "Thanks — your offer was sent. We'll be in touch by email.";
+        } else {
+          throw new Error("rejected");
+        }
+      } catch {
+        status.className = "status err";
+        status.textContent =
+          "Something went wrong. Please try again in a moment.";
+        if (btn) btn.disabled = false;
+        // Reset Turnstile so a fresh token is issued on retry.
+        (window as unknown as { turnstile?: { reset: () => void } }).turnstile?.reset();
+      }
+    });
+  }
+</script>

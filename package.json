@@ -1,0 +1,24 @@
+{
+  "name": "domain-lander",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "One codebase, many domains. Host-auto-detected 'for sale' landing pages with SSR, served from a single Cloudflare Pages deployment.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "add-domains": "node --experimental-strip-types scripts/add-domains.ts"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.5.0",
+    "astro": "^5.7.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@cloudflare/workers-types": "^4.20260616.1",
+    "@types/node": "^22.19.21",
+    "typescript": "^5.8.0"
+  }
+}

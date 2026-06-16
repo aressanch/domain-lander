@@ -1,0 +1,285 @@
+---
+import type { DomainListing } from "../lib/domains";
+import OfferForm from "./OfferForm.astro";
+
+interface Props {
+  listing: DomainListing;
+  /** Fallback Buy Now link from env, used only when a listing omits buyUrl. */
+  defaultBuyUrl?: string;
+}
+
+const { listing, defaultBuyUrl } = Astro.props;
+const sensitive = listing.sensitive === true;
+const sold = listing.status === "sold";
+
+// --- Copy-rule gate (enforced here, not just documented) ---
+// When sensitive: no tagline, no price, no Buy Now, no urgency. Neutral listing.
+const showTagline = !sensitive && !sold && Boolean(listing.tagline);
+const showPrice =
+  !sensitive && !sold && typeof listing.bin === "number" && listing.bin > 0;
+const effectiveBuyUrl = listing.buyUrl ?? defaultBuyUrl;
+const showBuyNow = showPrice && Boolean(effectiveBuyUrl);
+const showOffers = !sold && listing.offers === true;
+
+const accent = listing.accent ?? "#5b71f0";
+const currency = listing.currency ?? "USD";
+
+const priceLabel = showPrice
+  ? new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(listing.bin as number)
+  : "";
+---
+
+<main class="wrap" style={`--accent: ${accent};`}>
+  <section class="card">
+    <h1 class="wordmark">{listing.domain}</h1>
+
+    {
+      sold ? (
+        <p class="lede">This domain has been sold.</p>
+      ) : (
+        <p class="lede">This domain is for sale.</p>
+      )
+    }
+
+    {showTagline && <p class="tagline">{listing.tagline}</p>}
+
+    {
+      showPrice && (
+        <div class="price-row">
+          <span class="price">{priceLabel}</span>
+          {showBuyNow && (
+            <a
+              class="btn primary buy"
+              href={effectiveBuyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Buy it now
+            </a>
+          )}
+        </div>
+      )
+    }
+
+    {showOffers && <OfferForm domain={listing.domain} />}
+
+    {
+      !sold && (
+        <p class="trust">
+          Transactions are completed securely via escrow (Escrow.com or the
+          listing marketplace). Payment is never collected on this page.
+        </p>
+      )
+    }
+  </section>
+
+  <footer class="foot">{listing.domain}</footer>
+</main>
+
+<style>
+  :root {
+    color-scheme: light dark;
+  }
+
+  .wrap {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    padding: 2rem 1.25rem;
+    box-sizing: border-box;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 34rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    text-align: center;
+  }
+
+  .wordmark {
+    margin: 0;
+    font-size: clamp(2rem, 7vw, 3.5rem);
+    font-weight: 680;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    word-break: break-word;
+  }
+
+  .lede {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--fg-muted);
+  }
+
+  .tagline {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--fg);
+    max-width: 30rem;
+    margin-inline: auto;
+  }
+
+  .price-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    margin-top: 0.25rem;
+  }
+
+  .price {
+    font-size: 1.5rem;
+    font-weight: 640;
+    letter-spacing: -0.01em;
+  }
+
+  .btn {
+    --b: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-weight: 560;
+    border-radius: 0.6rem;
+    padding: 0.7rem 1.25rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+    text-decoration: none;
+    transition: filter 0.15s ease, transform 0.05s ease;
+  }
+  .btn:active {
+    transform: translateY(1px);
+  }
+  .btn.primary {
+    background: var(--b);
+    color: #fff;
+  }
+  .btn.primary:hover {
+    filter: brightness(1.07);
+  }
+  .btn.primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .trust {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: var(--fg-faint);
+    max-width: 28rem;
+    margin-inline: auto;
+    line-height: 1.5;
+  }
+
+  .foot {
+    font-size: 0.8rem;
+    color: var(--fg-faint);
+    letter-spacing: 0.01em;
+  }
+
+  /* --- Offer form (scoped via descendant; OfferForm has no <style>) --- */
+  .card :global(.offer) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    text-align: left;
+    margin-top: 0.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    background: var(--surface);
+  }
+  .card :global(.field) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .card :global(.field label) {
+    font-size: 0.82rem;
+    font-weight: 560;
+    color: var(--fg-muted);
+  }
+  .card :global(.req) {
+    color: var(--accent);
+  }
+  .card :global(.offer input),
+  .card :global(.offer textarea) {
+    font: inherit;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6rem 0.7rem;
+    border-radius: 0.55rem;
+    border: 1px solid var(--line-strong);
+    background: var(--input-bg);
+    color: var(--fg);
+  }
+  .card :global(.offer input:focus-visible),
+  .card :global(.offer textarea:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+  .card :global(.offer .btn.primary) {
+    margin-top: 0.25rem;
+  }
+  /* Honeypot: visually and physically removed from flow, kept in DOM. */
+  .card :global(.hp) {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .card :global(.status) {
+    margin: 0;
+    font-size: 0.85rem;
+    min-height: 1.2em;
+  }
+  .card :global(.status.ok) {
+    color: var(--ok);
+  }
+  .card :global(.status.err) {
+    color: var(--err);
+  }
+  .card :global(.cf-turnstile) {
+    min-height: 65px;
+  }
+
+  /* --- Theme tokens --- */
+  :global(:root) {
+    --fg: #14151a;
+    --fg-muted: #44464f;
+    --fg-faint: #80838f;
+    --bg: #fbfbfd;
+    --surface: #ffffff;
+    --input-bg: #ffffff;
+    --line: #e6e7ec;
+    --line-strong: #d2d4dc;
+    --ok: #1a7f4b;
+    --err: #c23b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root) {
+      --fg: #ececf1;
+      --fg-muted: #b3b6c0;
+      --fg-faint: #80838f;
+      --bg: #0d0e12;
+      --surface: #16181f;
+      --input-bg: #14151b;
+      --line: #262932;
+      --line-strong: #353944;
+      --ok: #46c884;
+      --err: #f0736f;
+    }
+  }
+</style>
